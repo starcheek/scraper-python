@@ -32,9 +32,8 @@ async def main():
     tasks = []
     for hotel in baselinks:
         write_first_column(hotel)
-        # tasks.append(get_data(hotel,start_date, end_date))
-
-    # await asyncio.gather(*tasks, return_exceptions=False)
+        tasks.append(get_data(hotel,start_date, end_date))
+    await asyncio.gather(*tasks, return_exceptions=False)
 
     workbook.close()
 
@@ -54,9 +53,9 @@ async def get_data(hotel_name, start_date, end_date):
         link = re.sub(r'checkin=\d\d\d\d-\d\d-\d\d', "checkin=" + single_date.strftime(LINK_DATE_FORMAT), link)
         link = re.sub(r'checkout=\d\d\d\d-\d\d-\d\d', "checkout=" + next_day.strftime(LINK_DATE_FORMAT), link)
        # print(str(single_date) + "\n")
-        await asyncio.gather(get_day_data(link, hotel_list[hotel_name]), return_exceptions=False)
+        await asyncio.gather(get_day_data(link, hotel_list[hotel_name], next_day), return_exceptions=False)
         
-async def get_day_data(link, comparison_map):
+async def get_day_data(link, comparison_map, date):
     page = session.get(link)
   #  print(link + "\n")
     soup = BeautifulSoup(page.content, 'html.parser')
@@ -78,6 +77,12 @@ async def get_day_data(link, comparison_map):
 
     #print(results)
     #print("\n\n\n\n\n")
+    #Results room_id: (room_name, available_rooms)
+
+    for room in results.values:
+        for available_count in room[1]:
+            workbook.get_worksheet_by_name(hotel_name, )
+
     return results    
 
 if __name__ == "__main__":
