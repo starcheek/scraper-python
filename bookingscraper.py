@@ -17,11 +17,9 @@ LINK_DATE_FORMAT = "%Y-%m-%d"
 
 jolanta_results = {},
 bahnhofs_results = {}
-start_date = datetime.datetime(2021, 6, 10)
-end_date = datetime.datetime(2021, 6, 11)
+start_date = datetime.datetime(2021, 10, 10)
+end_date = datetime.datetime(2021, 10, 15)
 workbook = xlsxwriter.Workbook('results.xlsx')
-
-
 
 async def main():
    # print("Date format: DD-MM-YYYY")
@@ -37,53 +35,60 @@ async def main():
 
     workbook.close()
 
-
 def write_first_column(hotel):
     ws = workbook.add_worksheet(hotel)
     ws.set_column(0, 0, 46)
     for index, room_pair in enumerate(hotel_list[hotel].values()):
-        ws.write_string(index, 0, room_pair[0])
+        ws.write_string(index + 1, 0, room_pair[0])
 
 async def get_data(hotel_name, start_date, end_date):
     daterange = pandas.date_range(start_date, end_date)
     
-    for single_date in daterange:
+    for index, single_date in enumerate(daterange):
         next_day = single_date + datetime.timedelta(days=1)
         link = baselinks[hotel_name]
         link = re.sub(r'checkin=\d\d\d\d-\d\d-\d\d', "checkin=" + single_date.strftime(LINK_DATE_FORMAT), link)
         link = re.sub(r'checkout=\d\d\d\d-\d\d-\d\d', "checkout=" + next_day.strftime(LINK_DATE_FORMAT), link)
-       # print(str(single_date) + "\n")
-        await asyncio.gather(get_day_data(link, hotel_list[hotel_name], next_day), return_exceptions=False)
+        await asyncio.gather(get_day_data(link, hotel_name, next_day, index), return_exceptions=False)
         
-async def get_day_data(link, comparison_map, date):
+async def get_day_data(link, hotel_name, date, index):
     page = session.get(link)
-  #  print(link + "\n")
+    comparison_map = hotel_list[hotel_name]
     soup = BeautifulSoup(page.content, 'html.parser')
     table = soup.find('table', class_="hprt-table").find('tbody')
+
     room_copy = {}
-    for room_link in table.find_all('a', class_="hprt-roomtype-link"):
-        data_room_id = int(room_link['data-room-id'])
-        room_name = room_link.find('span', class_="hprt-roomtype-icon-link").get_text(strip = True)
-        free_rooms = len(table.find('select', {"data-room-id":str(data_room_id)}).find_all('option')) - 1
-        room_copy[data_room_id] = (room_name, comparison_map.get(data_room_id, 0)[1] - free_rooms)
+    comparison_room_id = -1
+    comparison_room_name = ""
+
+    for tr in table.find_all('tr', class_="js-rt-block-row"):
+
+        room_id = int(tr.find('select')["data-room-id"])
+        price = re.search(r'[0-9]{1,4}', tr.find('span', class_="prco-valign-middle-helper").get_text()).group()
+        if room_id != comparison_room_id:
+            free_rooms = len(tr.find('select', {"data-room-id":str(room_id)}).find_all('option')) - 1
+            comparison_room_name = tr.find('a', class_="hprt-roomtype-link").find('span', class_="hprt-roomtype-icon-link").get_text(strip = True)
+            room_copy[room_id] = (comparison_room_name, [ comparison_map.get(room_id, 0)[1] - free_rooms, [price] ])
+            comparison_room_id = room_id
+        else:
+            room_copy[comparison_room_id][1][1].append(price)
 
     results = {}
     for key in comparison_map.keys():
-        value = comparison_map[key][1]
-        if key in room_copy:
-            value = room_copy[key][1]
-            
-        results[key] = (comparison_map[key][0], comparison_map[key][1] - value )
+        results[key] = (comparison_map[key][0], [ comparison_map[key][1] - room_copy[key][1][0], room_copy[key][1][1]])
+        print(results[key])
+        print("\n")
 
-    #print(results)
-    #print("\n\n\n\n\n")
-    #Results room_id: (room_name, available_rooms)
+    print("\n\n\n\n\n")
 
-    for room in results.values:
-        for available_count in room[1]:
-            workbook.get_worksheet_by_name(hotel_name, )
+    # ws = workbook.get_worksheet_by_name(hotel_name)
+    # ws.write(0, index + 1, date.strftime(LINK_DATE_FORMAT))
+    # for room in results.values():
+    #     for available_count in room[1]:
+           
+    # print(results)
+ #  return results    
 
-    return results    
 
 if __name__ == "__main__":
     asyncio.run(main())
