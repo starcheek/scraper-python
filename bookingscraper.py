@@ -13,63 +13,141 @@ import xlsxwriter
 session = HTMLSession()
 
 LINK_DATE_FORMAT = "%Y-%m-%d"
+EXCEL_DATE_FORMAT = "%d/%m"
+WORKSHEET_NAME = "RESULTS"
+INITAL_DATA_CELL_INDEX = 1 # Offset for date and data. I did not change indexes when putting data, so this offset is needed
 
 jolanta_results = {},
 bahnhofs_results = {}
-max_item_count = 0
+max_item_count = 0 # Days * hotels
 fetched_item_count = 0
+initial_row_indexes = {} # Indicates for each hotel where to start putting data
+colored_day_range = range(5, 7)
 
-workbook = xlsxwriter.Workbook('results.xlsx')
-taken   = workbook.add_format({
-    'bg_color': "#4BA8FF",
-    'text_wrap': True,
-    'valign': 'center',
-    'border_color': "#000000",
-    'border': 1
+time = datetime.datetime.now().strftime("_on_%d-%m_at_%H-%M")
+workbook = xlsxwriter.Workbook('results' + str(time) + '.xlsx')
+ws = workbook.add_worksheet(WORKSHEET_NAME)
+
+TAKEN_STYLE   = workbook.add_format({
+'bg_color': "#4BA8FF",
+'text_wrap': True,
+'valign': 'center',
+'border_color': "#000000",
+'border': 1
 })
-available = workbook.add_format({
+
+AVAILABLE_STYLE = workbook.add_format({
     'bg_color': "#FFBFC3",
     'text_wrap': True,
     'valign': 'center',
     'border_color': "#000000",
     'border': 1
 })
-weekday = workbook.add_format({
+
+WEEKDAY_STYLE = workbook.add_format({
     'bg_color': "#caffbf",
     'border_color': "#000000",
     'border': 1
 })
 
-async def main():
-    print("Date format: DD-MM-YYYY")
-    start_date_input = input("Input start date:").split("-")
-    end_date_input = input("Input end date:").split("-")
-    start_date = datetime.datetime(int(start_date_input[2]), int(start_date_input[1]), int(start_date_input[0]))
-    end_date = datetime.datetime(int(end_date_input[2]), int(end_date_input[1]), int(end_date_input[0]))
-    tasks = []
-    for hotel in baselinks:
-        write_first_column(hotel)
-        tasks.append(get_data(hotel,start_date, end_date))
-    await asyncio.gather(*tasks, return_exceptions=False)
+MERGE_FORMAT_STYLE = workbook.add_format({
+    'bold': 1,
+    'border': 1,
+    'align': 'center',
+    'valign': 'vcenter',
+    'fg_color': 'yellow',
+    'rotation': 90,
+    })
 
-    workbook.close()
+MERGE_FORMAT_STYLE_HORIZONTAL = workbook.add_format({
+'bold': 1,
+'border': 1,
+'align': 'center',
+'valign': 'vcenter',
+'fg_color': 'yellow',
+})
 
-def write_first_column(hotel):
-    ws = workbook.add_worksheet(hotel)
-    ws.set_column(0, 0, 46)
-    ws.set_column(1 , 100, 25)
-    ws.set_default_row(25)
-    index = 0
-    for room_pair in hotel_list[hotel].values():
-        for count in range(room_pair[1]):
-            ws.write_string(index + 1, 0, room_pair[0])
-            index += 1
+HOTEL_NAMES_STYLE = workbook.add_format({
+    'border': 1,
+    'align': 'left'
+    })
+
+def setup_workbook():
+    ws.set_column(0,0,4)
+    ws.write(0, 0, "Hotel")
+    ws.set_column(1, 1, 20)
+    ws.write(0, 1, "Name")
+    ws.set_column(2 , 100, 5)
+    ws.set_default_row(16)
+
+def write_first_column():
+    index = 1
+    for hotel_values in hotel_list.values():
+        for room in hotel_values.values():
+            for count in range(room[1]):
+                ws.write_string(index, 1, room[0], HOTEL_NAMES_STYLE)
+                index += 1
 
 def print_percentage():
     global fetched_item_count
     global max_item_count
     fetched_item_count += 1
-    print(str(int(fetched_item_count / max_item_count * 100)) + "%")  
+    print(str(int(fetched_item_count / max_item_count * 100)) + "%")
+
+def get_initial_row_indexes():
+    key_before = ""
+    for hotel in hotel_list:
+        if key_before == "":
+            initial_row_indexes[hotel] = 1
+            count = 0
+            for pair in hotel_list[hotel].values():
+                count += pair[1]
+            first_cell = 2
+            second_cell = count+1
+            ws.merge_range('A2:A'+str(count+1), hotel, MERGE_FORMAT_STYLE)
+        else:
+            count = 0
+            for pair in hotel_list[key_before].values():
+                count += pair[1]
+            inital_index = initial_row_indexes[key_before] + count  # +1 at the end because Merge takes index from 1
+            initial_row_indexes[hotel] = inital_index
+
+            count = 0
+            for pair in hotel_list[hotel].values():
+                count += pair[1]
+            
+            first_cell = initial_row_indexes[hotel] + 1
+            second_cell = count + inital_index
+            
+            if first_cell != second_cell:
+                ws.merge_range('A' + str(initial_row_indexes[hotel] + 1)+':A'+str(count + inital_index), hotel, MERGE_FORMAT_STYLE)
+            else: 
+                ws.write(first_cell - 1, 0, hotel, MERGE_FORMAT_STYLE_HORIZONTAL )
+
+
+        key_before = hotel    
+
+
+async def main():
+    print("Date format: DD-MM-YY")
+    start_date_input = input("Input start date:").split("-")
+    end_date_input = input("Input end date:").split("-")
+    setup_workbook()
+    get_initial_row_indexes()
+
+    # start_date_input = "11-06-21".split("-")
+    # end_date_input = "15-06-21".split("-")
+    start_date = datetime.datetime(int(start_date_input[2]) + 2000, int(start_date_input[1]), int(start_date_input[0]))
+    end_date = datetime.datetime(int(end_date_input[2]) + 2000, int(end_date_input[1]), int(end_date_input[0]))
+    tasks = []
+    
+    write_first_column()
+
+    for hotel in baselinks:
+        tasks.append(get_data(hotel, start_date, end_date))
+    await asyncio.gather(*tasks, return_exceptions=False)
+
+    workbook.close()
 
 async def get_data(hotel_name, start_date, end_date):
     daterange = pandas.date_range(start_date, end_date)
@@ -82,7 +160,14 @@ async def get_data(hotel_name, start_date, end_date):
         link = baselinks[hotel_name]
         link = re.sub(r'checkin=\d\d\d\d-\d\d-\d\d', "checkin=" + single_date.strftime(LINK_DATE_FORMAT), link)
         link = re.sub(r'checkout=\d\d\d\d-\d\d-\d\d', "checkout=" + next_day.strftime(LINK_DATE_FORMAT), link) # Replace date in link
-        await asyncio.gather(get_day_data(link, hotel_name, single_date, index+1), return_exceptions=False)
+
+        column = index + 1
+        if single_date.weekday() in colored_day_range:
+            ws.write(0, column + INITAL_DATA_CELL_INDEX, single_date.strftime(EXCEL_DATE_FORMAT), WEEKDAY_STYLE)
+        else:
+            ws.write(0, column + INITAL_DATA_CELL_INDEX, single_date.strftime(EXCEL_DATE_FORMAT))
+
+        await asyncio.gather(get_day_data(link, hotel_name, single_date, column), return_exceptions=False)
         
 async def get_day_data(link, hotel_name, date, column):
     page = session.get(link)
@@ -121,30 +206,18 @@ async def get_day_data(link, hotel_name, date, column):
         for key in comparison_map.keys():
             results[key] = (comparison_map[key][0], [0, []])
 
-
-
 # ('Standarta divvietīgs numurs (1 gulta)', [2, ['55', '85']])
-    ws = workbook.get_worksheet_by_name(hotel_name)
-
-    if date.weekday() in range(4, 7):
-        ws.write(0, column, date.strftime(LINK_DATE_FORMAT), weekday)
-    else:
-        ws.write(0, column, date.strftime(LINK_DATE_FORMAT))
     
-    row = 1
+    row = initial_row_indexes[hotel_name]
     for room_key in results.keys():
         room = results[room_key]
         available_room_count = room[1][0]
 
         for count in range(comparison_map[room_key][1]):
-            price_string = ""
-            for price in room[1][1]:
-                price_string += str(price) + "€/ "
-
             if available_room_count < 1:
-                ws.write(row, column, "", taken)
+                ws.write(row, column + INITAL_DATA_CELL_INDEX, " ", TAKEN_STYLE)
             else:
-                ws.write(row, column, price_string, available)
+                ws.write(row, column + INITAL_DATA_CELL_INDEX, str(max(room[1][1])), AVAILABLE_STYLE)
             
             available_room_count -= 1
             row += 1
