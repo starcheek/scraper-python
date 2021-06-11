@@ -33,21 +33,30 @@ TAKEN_STYLE   = workbook.add_format({
 'text_wrap': True,
 'valign': 'center',
 'border_color': "#000000",
-'border': 1
+'border': 1,
+'font_size': 8
 })
 
 AVAILABLE_STYLE = workbook.add_format({
-    'bg_color': "#FFBFC3",
+    'bg_color': "#FFF0F0",
     'text_wrap': True,
     'valign': 'center',
     'border_color': "#000000",
-    'border': 1
+    'border': 1,
+    'font_size': 8
 })
 
 WEEKDAY_STYLE = workbook.add_format({
     'bg_color': "#caffbf",
     'border_color': "#000000",
-    'border': 1
+    'border': 1,
+    'font_size': 8
+})
+
+WORK_DAY_STYLE = workbook.add_format({
+    'border_color': "#000000",
+    'border': 1,
+    'font_size': 8
 })
 
 MERGE_FORMAT_STYLE = workbook.add_format({
@@ -60,11 +69,11 @@ MERGE_FORMAT_STYLE = workbook.add_format({
     })
 
 MERGE_FORMAT_STYLE_HORIZONTAL = workbook.add_format({
-'bold': 1,
-'border': 1,
-'align': 'center',
-'valign': 'vcenter',
-'fg_color': 'yellow',
+    'bold': 1,
+    'border': 1,
+    'align': 'center',
+    'valign': 'vcenter',
+    'fg_color': 'yellow',
 })
 
 HOTEL_NAMES_STYLE = workbook.add_format({
@@ -77,7 +86,7 @@ def setup_workbook():
     ws.write(0, 0, "Hotel")
     ws.set_column(1, 1, 20)
     ws.write(0, 1, "Name")
-    ws.set_column(2 , 100, 5)
+    ws.set_column(2 , 100, 3)
     ws.set_default_row(16)
 
 def write_first_column():
@@ -165,7 +174,7 @@ async def get_data(hotel_name, start_date, end_date):
         if single_date.weekday() in colored_day_range:
             ws.write(0, column + INITAL_DATA_CELL_INDEX, single_date.strftime(EXCEL_DATE_FORMAT), WEEKDAY_STYLE)
         else:
-            ws.write(0, column + INITAL_DATA_CELL_INDEX, single_date.strftime(EXCEL_DATE_FORMAT))
+            ws.write(0, column + INITAL_DATA_CELL_INDEX, single_date.strftime(EXCEL_DATE_FORMAT), WORK_DAY_STYLE)
 
         await asyncio.gather(get_day_data(link, hotel_name, single_date, column), return_exceptions=False)
         
@@ -217,7 +226,7 @@ async def get_day_data(link, hotel_name, date, column):
             if available_room_count < 1:
                 ws.write(row, column + INITAL_DATA_CELL_INDEX, " ", TAKEN_STYLE)
             else:
-                ws.write(row, column + INITAL_DATA_CELL_INDEX, str(max(room[1][1])), AVAILABLE_STYLE)
+                ws.write(row, column + INITAL_DATA_CELL_INDEX, int(max(room[1][1])), AVAILABLE_STYLE)
             
             available_room_count -= 1
             row += 1
