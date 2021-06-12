@@ -25,7 +25,7 @@ fetched_item_count = 0
 initial_row_indexes = {} # Indicates for each hotel where to start putting data
 colored_day_range = range(5, 7)
 
-time = datetime.datetime.now().strftime("%m%d-%H%M")
+time = datetime.datetime.now().strftime("%Y%m%d-%H%M")
 workbook = xlsxwriter.Workbook(time + '.xlsx')
 ws = workbook.add_worksheet(WORKSHEET_NAME)
 
