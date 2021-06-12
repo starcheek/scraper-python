@@ -13,10 +13,11 @@ import xlsxwriter
 session = HTMLSession()
 
 LINK_DATE_FORMAT = "%Y-%m-%d"
-EXCEL_DATE_FORMAT = "%d/%m"
+EXCEL_DATE_FORMAT = "%d %m"
 WORKSHEET_NAME = "RESULTS"
 INITAL_DATA_CELL_INDEX = 1 # Offset for date and data. I did not change indexes when putting data, so this offset is needed
 
+debug  = False
 jolanta_results = {},
 bahnhofs_results = {}
 max_item_count = 0 # Days * hotels
@@ -24,8 +25,8 @@ fetched_item_count = 0
 initial_row_indexes = {} # Indicates for each hotel where to start putting data
 colored_day_range = range(5, 7)
 
-time = datetime.datetime.now().strftime("_on_%d-%m_at_%H-%M")
-workbook = xlsxwriter.Workbook('results' + str(time) + '.xlsx')
+time = datetime.datetime.now().strftime("%m%d-%H%M")
+workbook = xlsxwriter.Workbook(time + '.xlsx')
 ws = workbook.add_worksheet(WORKSHEET_NAME)
 
 TAKEN_STYLE   = workbook.add_format({
@@ -34,7 +35,7 @@ TAKEN_STYLE   = workbook.add_format({
 'valign': 'center',
 'border_color': "#000000",
 'border': 1,
-'font_size': 8
+'font_size': 6
 })
 
 AVAILABLE_STYLE = workbook.add_format({
@@ -43,20 +44,22 @@ AVAILABLE_STYLE = workbook.add_format({
     'valign': 'center',
     'border_color': "#000000",
     'border': 1,
-    'font_size': 8
+    'font_size': 6
 })
 
 WEEKDAY_STYLE = workbook.add_format({
     'bg_color': "#caffbf",
     'border_color': "#000000",
     'border': 1,
-    'font_size': 8
+    'font_size': 8,
+    'text_wrap': True
 })
 
 WORK_DAY_STYLE = workbook.add_format({
     'border_color': "#000000",
     'border': 1,
-    'font_size': 8
+    'font_size': 8,
+    'text_wrap': True
 })
 
 MERGE_FORMAT_STYLE = workbook.add_format({
@@ -74,20 +77,25 @@ MERGE_FORMAT_STYLE_HORIZONTAL = workbook.add_format({
     'align': 'center',
     'valign': 'vcenter',
     'fg_color': 'yellow',
+    'font_size': 8
 })
 
 HOTEL_NAMES_STYLE = workbook.add_format({
     'border': 1,
-    'align': 'left'
+    'align': 'left',
+    'font_size': 8
     })
 
 def setup_workbook():
-    ws.set_column(0,0,4)
-    ws.write(0, 0, "Hotel")
-    ws.set_column(1, 1, 20)
-    ws.write(0, 1, "Name")
-    ws.set_column(2 , 100, 3)
+    ws.set_column(0, 0, 3) # Set first column width
+    ws.set_column(1, 1, 10) #Set second colummn width
+    ws.set_column(2 , 1000, 1.8) #Set all other column widths
     ws.set_default_row(16)
+    ws.set_row(0, 22)
+
+    ws.write(0, 0, "Hot")
+    ws.write(0, 1, "Name")
+
 
 def write_first_column():
     index = 1
@@ -101,7 +109,7 @@ def print_percentage():
     global fetched_item_count
     global max_item_count
     fetched_item_count += 1
-    print(str(int(fetched_item_count / max_item_count * 100)) + "%")
+    print("%.2f" % (fetched_item_count / max_item_count * 100) + "%")
 
 def get_initial_row_indexes():
     key_before = ""
@@ -113,7 +121,8 @@ def get_initial_row_indexes():
                 count += pair[1]
             first_cell = 2
             second_cell = count+1
-            ws.merge_range('A2:A'+str(count+1), hotel, MERGE_FORMAT_STYLE)
+            for x in range(1,count + 1):
+                ws.write(x, 0, hotel, MERGE_FORMAT_STYLE_HORIZONTAL )
         else:
             count = 0
             for pair in hotel_list[key_before].values():
@@ -124,23 +133,30 @@ def get_initial_row_indexes():
             count = 0
             for pair in hotel_list[hotel].values():
                 count += pair[1]
-            
+
             first_cell = initial_row_indexes[hotel] + 1
             second_cell = count + inital_index
-            
-            if first_cell != second_cell:
-                ws.merge_range('A' + str(initial_row_indexes[hotel] + 1)+':A'+str(count + inital_index), hotel, MERGE_FORMAT_STYLE)
-            else: 
-                ws.write(first_cell - 1, 0, hotel, MERGE_FORMAT_STYLE_HORIZONTAL )
+
+            for x in range(initial_row_indexes[hotel], count + inital_index ):
+                ws.write(x, 0, hotel, MERGE_FORMAT_STYLE_HORIZONTAL )
 
 
         key_before = hotel    
 
 
+
 async def main():
     print("Date format: DD-MM-YY")
-    start_date_input = input("Input start date:").split("-")
-    end_date_input = input("Input end date:").split("-")
+    start_date_input = ""
+    end_date_input = ""
+
+    if debug:
+        start_date_input = "20-07-21".split("-")
+        end_date_input = "20-07-21".split("-")
+    else:
+        start_date_input = input("Input start date:").split("-")
+        end_date_input = input("Input end date:").split("-")    
+
     setup_workbook()
     get_initial_row_indexes()
 
